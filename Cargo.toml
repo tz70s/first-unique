@@ -4,7 +4,16 @@ description = "Find first unique word from a large CSV file."
 version = "0.1.0"
 authors = ["Tzu-Chiao Yeh <su3g4284zo6y7@gmail.com>"]
 edition = "2018"
+license = "MIT"
+homepage = "https://github.com/tz70s/first-unique"
+repository = "https://github.com/tz70s/first-unique"
+exclude = ["data/*"]
+
+[lib]
+name = "first_unique"
+path = "src/lib.rs"
 
 [dependencies]
 log = "0.4"
 env_logger = "0.6"
+rand = "0.7.0"

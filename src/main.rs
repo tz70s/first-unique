@@ -1,20 +1,14 @@
 //! Find first unique word from a large CSV file.
 //!
-//! ## Problem Description
-//!
-//! Given a large CSV file (~100GB) and a limited RAM machine (16GB),
-//! find the first unique word from the CSV file by single iteration.
-//!
-//! ## Optimization Goal
-//!
-//! * Eliminating I/O operations (number of reads, writes).
-//!
+//! See README.md for algorithm illustration.
 
 use env_logger;
-use log;
+use first_unique;
 
 fn main() {
-    env_logger::init();
+    let env = env_logger::Env::default().filter_or("RUST_LOG", "info");
 
-    log::info!("Start finding the first unique word from CSV file.");
+    env_logger::init_from_env(env);
+
+    first_unique::find_first_unique(first_unique::Strategy::MapReduce(0));
 }
