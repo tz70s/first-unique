@@ -57,7 +57,7 @@ impl Shuffler {
             .map(|idx| {
                 let (tx, rx) = mpsc::channel();
 
-                let tmp_file = format!("{}{}", shuffle::TEMP_FILE_PREFIX, idx);
+                let tmp_file = shuffle::temp_file(idx);
 
                 log::debug!(
                     "Create temp file {} in entry format for future reducing.",
@@ -78,11 +78,10 @@ fn entry_writer<W: Write>(target: W, rx: mpsc::Receiver<(String, usize)>) {
     let mut writer = BufWriter::new(target);
 
     for (key, index) in rx {
-        let entry = entry::Entry::new(key, index);
-        let text = format!("{}\n", entry);
+        let block = entry::Block::create(key, index);
 
         writer
-            .write(text.as_bytes())
+            .write(&block.as_bytes())
             .expect("Unexpected write failure");
     }
 }

@@ -27,7 +27,11 @@ pub fn find_first_unique(conf: Config) -> Option<String> {
 
     let file = File::open(conf.source_csv).expect("Failed to open file.");
 
-    let result = shuffle::Group::run(file).map(reduce::Reducer::for_first_unique);
+    let result = shuffle::Group::run(file).and_then(|group| {
+        let key = reduce::Reducer::for_first_unique(group);
+
+        group.remove_temp_files().map(|_| key)
+    });
 
     match result {
         Ok(key) => key,

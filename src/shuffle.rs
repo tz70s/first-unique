@@ -5,12 +5,17 @@
 //! The main thread read csv file and group values into different threads.
 
 use std::collections::hash_map;
+use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Read};
 
 mod shuffler;
 
 pub const TEMP_FILE_PREFIX: &'static str = "/tmp/word-count";
+
+fn temp_file(index: u32) -> String {
+    format!("{}{}", TEMP_FILE_PREFIX, index)
+}
 
 #[derive(Clone, Copy)]
 pub struct Group {
@@ -32,6 +37,15 @@ impl Group {
         shuffler.run_partition(csv_source)?;
 
         Ok(group)
+    }
+
+    /// Clean-up temporary files.
+    pub fn remove_temp_files(&self) -> Result<(), io::Error> {
+        for index in 0..self.size {
+            fs::remove_file(temp_file(index))?;
+        }
+
+        Ok(())
     }
 
     #[inline]
