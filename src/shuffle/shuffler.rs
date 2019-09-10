@@ -10,7 +10,8 @@ use log;
 use crate::entry;
 use crate::shuffle;
 
-struct Mapper(mpsc::Sender<(String, usize)>, thread::JoinHandle<()>);
+type Sender = mpsc::Sender<(String, usize)>;
+type Join = thread::JoinHandle<()>;
 
 pub struct Shuffler {
     group: shuffle::Group,
@@ -25,33 +26,36 @@ impl Shuffler {
     pub fn run_partition<R: Read>(&self, csv_source: R) -> Result<(), io::Error> {
         let buff_reader = BufReader::new(csv_source);
 
-        let mappers = self.spawn_mappers();
+        let (senders, joins) = self.spawn_mappers();
+        {
+            // To avoid deadlock, we need to drop senders here to terminate mapper threads.
+            let senders = senders;
 
-        for (lineno, line) in buff_reader.lines().enumerate() {
-            match line {
-                Ok(value) => {
-                    // Note: the value here contains a ',' at the end.
-                    // We don't need to do early trim to reduce overhead.
-                    // But still need to reduce it while finding the target value.
-                    let index = self.group.make_index(&value) as usize;
+            for (lineno, line) in buff_reader.lines().enumerate() {
+                match line {
+                    Ok(value) => {
+                        // Note: the value here contains a ',' at the end.
+                        // We don't need to do early trim to reduce overhead.
+                        // But still need to reduce it while finding the target value.
+                        let index = self.group.make_index(&value) as usize;
 
-                    log::trace!("Send value {} to thread index {}", value, index);
+                        log::trace!("Send value {} to thread index {}", value, index);
 
-                    mappers[index].0.send((value, lineno)).unwrap();
+                        senders[index].send((value, lineno)).unwrap();
+                    }
+                    Err(err) => return Err(err),
                 }
-                Err(err) => return Err(err),
             }
         }
 
-        // FIXME: deadlock.
-        // for mapper in mappers {
-        //    mapper.1.join().unwrap();
-        // }
+        for join in joins {
+            join.join().unwrap();
+        }
 
         Ok(())
     }
 
-    fn spawn_mappers(&self) -> Vec<Mapper> {
+    fn spawn_mappers(&self) -> (Vec<Sender>, Vec<Join>) {
         (0..self.group.size())
             .into_iter()
             .map(|idx| {
@@ -68,9 +72,9 @@ impl Shuffler {
 
                 let handle = thread::spawn(move || entry_writer(file, rx));
 
-                Mapper(tx, handle)
+                (tx, handle)
             })
-            .collect()
+            .unzip()
     }
 }
 
