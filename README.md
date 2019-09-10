@@ -5,7 +5,7 @@ Find first unique word from a large CSV file.
 
 ```bash
 # From sample data.
-cargo run
+cargo run --example check
 
 # Integration tests (mostly are ignored due to generate large file size).
 cargo test -- --ignored

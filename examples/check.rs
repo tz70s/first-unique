@@ -10,5 +10,10 @@ fn main() {
 
     env_logger::init_from_env(env);
 
-    first_unique::find_first_unique(first_unique::Strategy::MapReduce(0));
+    let conf = first_unique::Config::new("data/test.csv");
+
+    match first_unique::find_first_unique(conf) {
+        Some(value) => log::info!("Found the first unique value : {}", value),
+        None => log::info!("Can't find the unique value."),
+    }
 }
