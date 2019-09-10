@@ -6,31 +6,28 @@ use std::fmt::{self, Display};
 #[derive(Debug, Clone)]
 pub struct Record {
     pub count: u64,
-    pub lineno: u64,
+    pub index: u64,
 }
 
 impl Record {
-    pub fn new(lineno: u64) -> Record {
-        Record { count: 1, lineno }
+    pub fn new(index: u64) -> Record {
+        Record { count: 1, index }
     }
 
     pub fn merge(&self, other: &Record) -> Record {
-        let lineno = if self.lineno < other.lineno {
-            self.lineno
+        let index = if self.index < other.index {
+            self.index
         } else {
-            other.lineno
+            other.index
         };
 
         Record {
             count: self.count + other.count,
-            lineno,
+            index,
         }
     }
 }
 
-/// The core data structure of storage abstraction.
-/// The keys can be sorted similar to SSTable, and the count and index are used to track numbers and ordering.
-/// Due to the ordering from CSV file would be re-ordered.
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub key: String,
@@ -38,8 +35,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(key: String, lineno: usize) -> Entry {
-        let record = Record::new(lineno as u64);
+    pub fn new(key: String, index: usize) -> Entry {
+        let record = Record::new(index as u64);
         Entry { key, record }
     }
 
@@ -53,7 +50,7 @@ impl Display for Entry {
         write!(
             f,
             "{}%{}%{}",
-            self.key, self.record.count, self.record.lineno
+            self.key, self.record.count, self.record.index
         )
     }
 }

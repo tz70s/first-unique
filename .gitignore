@@ -7,3 +7,6 @@
 
 # Test files
 *large.csv
+
+# Generated
+/src/protos/

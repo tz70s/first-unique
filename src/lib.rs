@@ -2,12 +2,14 @@
 //!
 //! See README.md for algorithm illustration.
 
-use log;
 use std::fs::File;
 
-mod buff_io;
+use log;
+
+mod chunk;
 mod entry;
-mod map_reduce;
+mod reduce;
+mod shuffle;
 
 pub struct Config<'a> {
     source_csv: &'a str,
@@ -23,11 +25,15 @@ impl Config<'_> {
 pub fn find_first_unique(conf: Config) -> Option<String> {
     log::info!("Find the first unique word for file {}", conf.source_csv);
 
-    let mr = map_reduce::MapReduce::new(4);
-
     let file = File::open(conf.source_csv).expect("Failed to open file.");
 
-    mr.group_by_hash(file);
+    let result = shuffle::Group::run(file).map(reduce::Reducer::for_first_unique);
 
-    mr.reduce_unique()
+    match result {
+        Ok(key) => key,
+        Err(error) => {
+            log::error!("Failed to find unique key, cause: {}", error);
+            None
+        }
+    }
 }
