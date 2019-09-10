@@ -93,6 +93,7 @@ fn entry_writer<W: Write>(target: W, rx: mpsc::Receiver<(String, usize)>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entry::{Block, Entry};
 
     #[test]
     fn test_entry_writer() {
@@ -109,16 +110,14 @@ mod tests {
         let mut entries = vec![];
         entry_writer(&mut entries, rx);
 
-        /*
-        let text = std::str::from_utf8(&entries).unwrap();
+        let entries = Block::parse_entries(&entries);
 
-        let expect = source
+        let expect: Vec<_> = source
             .into_iter()
-            .map(|text| format!("{}\n", Entry::new(text.to_string())))
-            .fold(String::new(), |acc, x| acc + &x);
+            .enumerate()
+            .map(|(index, text)| Entry::new(text.to_string(), index))
+            .collect();
 
-        assert_eq!(text, expect);
-
-        */
+        assert_eq!(entries, expect);
     }
 }
