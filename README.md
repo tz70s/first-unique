@@ -37,7 +37,7 @@ can be partitioned into:
 {hello}
 ```
 
-by first letter.
+grouped by first letter.
 
 Then each group can be potentially reduced to smaller size, and be written into disk for following writes.
 The following writes keep the partition rules until all writes are done.
@@ -48,13 +48,64 @@ we iterate each group to determine the unique word with minimum index.
 To enhance parallelism,
 the reducer can run in different threads (if fits in memory) and finally reduce the minimum index (from local optimal to global optimal).
 
-The basic idea is not a uniform distribution solution, but we can simply use hash and mod for grouping them uniformly.
+The above approach of grouping by first letter is not a uniform distribution solution, but we can simply use hash and mod for grouping them uniformly.
 
-## Optimization Tricks
+## Implementation
+
+There are some core abstractions of the implementation:
+
+* `Entry`: the core data structure in (key, count, line number) format.
+* `Group`: specifying number of groups and threads to be used.
+* `Shuffler`: perform the shuffling phase.
+* `Reducer`: perform two-phase reducing.
+
+The purpose of `Entry` abstraction is for recording the read csv entries, intermediate storage format and reducing to find the unique word.
+
+In the **shuffling** phase, assuming we have csv file as following,
+
+```csv
+hello, world, apple, is, juicy, apple,
+```
+
+after reading, the main thread will send those values with line number to worker threads by hashing and modular.
+Then in each thread, convert those values in a `Block` struct, which is a length encoded of entry structure,
+and then write those values into intermediate files in binary format via [bytes](https://docs.rs/crate/bytes/0.4.12) crate.
+
+After shuffling, the **reducing** phase will read binary files and deserialise them into entries, then use a hash map to fold into a word count.
+Finally run two comparison loop to find a minimum line number.
+
+### Observations
+
+#### Q: The Efficiency of Hashing and Modular based Partition?
+
+Originally, I thought hashing would have high costs for calculating partition,
+which may be required to tweak the threading model to a more pipeline (some worker threads for hashing).
+However, as profiling result, the synchronization cost is much higher than calculating hash (and index).
+
+![call stack of shuffler](https://github.com/tz70s/first-unique/blob/master/images/callstack_shuffle.png)
+
+#### Q: The Efficiency of Serialization & Deserialization?
+
+They cost a little.
+
+![call stack of reducer](https://github.com/tz70s/first-unique/blob/master/images/callstack_reduce.png)
+
+The main CPU bottleneck of reducer is the memory allocation/de-allocation of objects.
+
+#### Q: Cost of Storage Layout?
+
+The `Block` struct consists of additional 24 bytes for 3 `u64` variables (offset, count and index).
+Therefore, if keys in source file are small, the intermediate file are much greater as well as memory usage.
+However, using `u64` is much scalable for large number of entries.
+
+### Potential Enhancement
+
+Memory reduction has a bottleneck in reducing phase.
 
 ### Evaluation Setup
 
-Use my own MacBook Pro'18 for 2.3 GHz Intel Core i5 CPU (4 core with hyper-threading), 16 GB RAM and less than 80 GB Disk space (Apple SSD).
+For profiling, I used my own MacBook Pro'18 for 2.3 GHz Intel Core i5 CPU (4 core with hyper-threading), 16 GB RAM and less than 80 GB Disk space (Apple SSD).
+To build a release build, run the following command.
 
 ```bash
 cargo build --release
