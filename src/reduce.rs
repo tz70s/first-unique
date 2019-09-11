@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 
 use log;
 
@@ -31,9 +31,9 @@ impl Reducer {
 
             log::debug!("Reduce local file {} to find first unique entry.", tmp_file);
 
-            let file = fs::File::open(tmp_file).expect("Failed to open temporary file.");
+            let mut file = fs::File::open(tmp_file).expect("Failed to open temporary file.");
 
-            match self.reduce_local_unique(file) {
+            match self.reduce_local_unique(&mut file) {
                 Some(entry) => entries.push(entry),
                 None => (),
             }
@@ -58,11 +58,9 @@ impl Reducer {
         result.map(|text| text.trim_end_matches(',').to_string())
     }
 
-    fn reduce_local_unique<R: Read>(&self, reader: R) -> Option<entry::Entry> {
+    fn reduce_local_unique<R: Read>(&self, reader: &mut R) -> Option<entry::Entry> {
         let mut buf = Vec::with_capacity(1024);
-        let mut buff_reader = BufReader::new(reader);
-
-        buff_reader.read_to_end(&mut buf).unwrap();
+        reader.read_to_end(&mut buf).unwrap();
 
         let merged_map =
             Block::parse_entries(&buf)

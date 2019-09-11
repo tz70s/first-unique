@@ -1,10 +1,11 @@
 //! Internal implementation of shuffler.
 
 use std::fs;
-use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::sync::mpsc;
 use std::thread;
 
+use failure::Error;
 use log;
 
 use crate::entry;
@@ -23,7 +24,7 @@ impl Shuffler {
         Shuffler { group }
     }
 
-    pub fn run_partition<R: Read>(&self, csv_source: R) -> Result<(), io::Error> {
+    pub fn run_partition<R: Read>(&self, csv_source: R) -> Result<(), Error> {
         let buff_reader = BufReader::new(csv_source);
 
         let (senders, joins) = self.spawn_mappers();
@@ -43,12 +44,14 @@ impl Shuffler {
 
                         senders[index].send((value, lineno)).unwrap();
                     }
-                    Err(err) => return Err(err),
+                    Err(err) => return Err(err.into()),
                 }
             }
         }
 
         for join in joins {
+            // The error return from the join indicates that any of child thread panic.
+            // Then we can panic here as well, since it's unexpected programmatically error.
             join.join().unwrap();
         }
 
@@ -64,11 +67,11 @@ impl Shuffler {
                 let tmp_file = shuffle::temp_file(idx);
 
                 log::debug!(
-                    "Create temp file {} in entry format for future reducing.",
+                    "Try to create temp file {} in entry format for future reducing.",
                     tmp_file
                 );
 
-                let file = fs::File::create(tmp_file).expect("Failed to create temporary file.");
+                let file = fs::File::create(tmp_file).expect("Can't create temp file");
 
                 let handle = thread::spawn(move || entry_writer(file, rx));
 
@@ -84,9 +87,10 @@ fn entry_writer<W: Write>(target: W, rx: mpsc::Receiver<(String, usize)>) {
     for (key, index) in rx {
         let block = entry::Block::create(key, index);
 
+        // We'll panic here and the parent (main) thread can be notified and safely panic as well.
         writer
             .write(&block.as_bytes())
-            .expect("Unexpected write failure");
+            .expect("Failed to write block within entry writer");
     }
 }
 

@@ -7,7 +7,9 @@
 use std::collections::hash_map;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::{self, Read};
+use std::io::Read;
+
+use failure::Error;
 
 mod shuffler;
 
@@ -23,14 +25,11 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn run<R: Read>(csv_source: R) -> Result<Group, io::Error> {
+    pub fn run<R: Read>(csv_source: R) -> Result<Group, Error> {
         Group::run_with_group_size(csv_source, 8)
     }
 
-    pub fn run_with_group_size<R: Read>(
-        csv_source: R,
-        group_size: u32,
-    ) -> Result<Group, io::Error> {
+    pub fn run_with_group_size<R: Read>(csv_source: R, group_size: u32) -> Result<Group, Error> {
         let group = Group { size: group_size };
 
         let shuffler = shuffler::Shuffler::new(group);
@@ -40,7 +39,7 @@ impl Group {
     }
 
     /// Clean-up temporary files.
-    pub fn remove_temp_files(&self) -> Result<(), io::Error> {
+    pub fn remove_temp_files(&self) -> Result<(), Error> {
         for index in 0..self.size {
             fs::remove_file(temp_file(index))?;
         }

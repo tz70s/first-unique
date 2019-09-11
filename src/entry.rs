@@ -83,11 +83,6 @@ impl Block {
         buf.take()
     }
 
-    #[inline]
-    pub fn entry(self) -> Entry {
-        self.entry
-    }
-
     pub fn parse_entries(bytes: &[u8]) -> Vec<Entry> {
         let mut entries = vec![];
         let mut buf = Cursor::new(bytes);
@@ -103,6 +98,7 @@ impl Block {
 
             buf.advance(offset);
 
+            // TODO: Optimize block? Current count field is not used.
             let count = buf.get_u64_be();
             let index = buf.get_u64_be();
 
@@ -120,9 +116,10 @@ mod tests {
 
     #[test]
     fn test_record_merge() {
-        let entry1 = Entry::new("Hello".to_string(), 0);
-        let entry2 = Entry::new("Hello".to_string(), 1);
-        let entry3 = Entry::new("Hello".to_string(), 2);
+        let record0 = Record::new(0);
+        let record1 = Record::new(1);
+
+        assert_eq!(record0.merge(&record1), Record { count: 2, index: 0 });
     }
 
     #[test]
