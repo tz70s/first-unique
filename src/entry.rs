@@ -1,10 +1,13 @@
-//! Entry is the basic abstraction of storage entry.
+//! Entry module consists of basic abstractions of storage.
+//!
+//! Including to: `Record`, `Entry` and `Block`.
 
 use std::fmt::{self, Display};
 use std::io::Cursor;
 
 use bytes::{self, Buf, BufMut};
 
+/// Storing the metadata for tracking through the algorithm.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Record {
     pub count: u64,
@@ -57,11 +60,20 @@ impl Display for Entry {
     }
 }
 
+/// Represents the storage block of each entry.
+/// It's a length encoded binary format.
+///
 /// The storage layout:
 ///
 /// =====================================================================================
-/// Offset (8 bytes) | Value (determined by Key size) | Count (8 bytes) | Index (8 bytes)
+/// Offset (8 bytes) | Key (determined by Offset) | Count (8 bytes) | Index (8 bytes)
 /// =====================================================================================
+///
+/// Currently, the Count field is not used since all entries write into temp files are count=1.
+/// However, preserve this field for potential pre-reducing optimization.
+///
+/// The u64 based offset, count and index makes the storage much greater if the keys are small.
+/// But it's an acceptable and much scalable than other numeric type.
 pub struct Block {
     offset: u64,
     entry: Entry,
@@ -75,7 +87,10 @@ impl Block {
     }
 
     pub fn as_bytes(&self) -> bytes::BytesMut {
-        let mut buf = bytes::BytesMut::new();
+        // Note: the BytesMut is not dynamic resizable.
+        // Allocate appropriate capacity for it since we already know that.
+        let buf_size = self.offset + 24;
+        let mut buf = bytes::BytesMut::with_capacity(buf_size as usize);
         buf.put_u64_be(self.offset);
         buf.put(&self.entry.key);
         buf.put_u64_be(self.entry.record.count);
@@ -98,7 +113,6 @@ impl Block {
 
             buf.advance(offset);
 
-            // TODO: Optimize block? Current count field is not used.
             let count = buf.get_u64_be();
             let index = buf.get_u64_be();
 
