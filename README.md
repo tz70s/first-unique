@@ -68,7 +68,7 @@ hello, world, apple, is, juicy, apple,
 ```
 
 after reading, the main thread will send those values with line number to worker threads by hashing and modular.
-Then in each thread, convert those values in a `Block` struct, which is a length encoded of entry structure,
+Then in each thread, converts those values in a `Block` struct, which is a length encoded of entry structure,
 and then write those values into intermediate files in binary format via [bytes](https://docs.rs/crate/bytes/0.4.12) crate.
 
 After shuffling, the **reducing** phase will read binary files and deserialise them into entries, then use a hash map to fold into a word count.
@@ -76,10 +76,18 @@ Finally run two comparison loop to find a minimum line number.
 
 ### Observations
 
+#### Q: I/O Efficiency?
+
+The benefits of this approach on I/O operations is that they are all sequential read/write operations,
+with one write and one read for a single word.
+
+The internal implementation use `BufReader`, `BufWriter` and `read_to_end` which are more efficient due to internal buffering.
+Also, for this approach, there's no significant benefit using async I/O. Hence, the implementation chose a traditional blocking I/O and native threading model.
+
 #### Q: The Efficiency of Hashing and Modular based Partition?
 
 Originally, I thought hashing would have high costs for calculating partition,
-which may be required to tweak the threading model to a more pipeline (some worker threads for hashing).
+which may be required to tweak the threading model to a more complex pipeline (some worker threads for hashing).
 However, as profiling result, the synchronization cost is much higher than calculating hash (and index).
 
 ![call stack of shuffler](https://github.com/tz70s/first-unique/blob/master/images/callstack_shuffle.png)
