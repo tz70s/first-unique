@@ -14,7 +14,8 @@ use failure::Error;
 mod shuffler;
 
 pub const TEMP_FILE_PREFIX: &'static str = "/tmp/word-count";
-pub const DEFAULT_GROUP_SIZE: u32 = 8;
+pub const DEFAULT_GROUP_SIZE: u32 = 32;
+pub const DEFAULT_THREADS: u32 = 8;
 
 fn temp_file(index: u32) -> String {
     format!("{}{}", TEMP_FILE_PREFIX, index)
@@ -23,15 +24,23 @@ fn temp_file(index: u32) -> String {
 #[derive(Clone, Copy)]
 pub struct Group {
     size: u32,
+    threads: u32,
 }
 
 impl Group {
     pub fn run<R: Read>(csv_source: R) -> Result<Group, Error> {
-        Group::run_with_group_size(csv_source, DEFAULT_GROUP_SIZE)
+        Group::run_with_group_size(csv_source, DEFAULT_GROUP_SIZE, DEFAULT_THREADS)
     }
 
-    pub fn run_with_group_size<R: Read>(csv_source: R, group_size: u32) -> Result<Group, Error> {
-        let group = Group { size: group_size };
+    pub fn run_with_group_size<R: Read>(
+        csv_source: R,
+        group_size: u32,
+        threads: u32,
+    ) -> Result<Group, Error> {
+        let group = Group {
+            size: group_size,
+            threads,
+        };
 
         let shuffler = shuffler::Shuffler::new(group);
         shuffler.run_partition(csv_source)?;
@@ -54,6 +63,11 @@ impl Group {
     }
 
     #[inline]
+    pub fn threads(&self) -> u32 {
+        self.threads
+    }
+
+    #[inline]
     fn make_index(&self, val: &str) -> u32 {
         // TODO: the hash and modular computation is the most heavy cpu-intensive job.
         // Can we try to accelerate this?
@@ -73,7 +87,10 @@ mod tests {
 
     #[test]
     fn test_make_index() {
-        let group = Group { size: 4 };
+        let group = Group {
+            size: 4,
+            threads: 1,
+        };
 
         let idx1 = group.make_index("Jon");
         let idx2 = group.make_index("Jon");

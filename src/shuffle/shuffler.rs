@@ -11,7 +11,7 @@ use log;
 use crate::entry;
 use crate::shuffle;
 
-type Sender = mpsc::Sender<(String, usize)>;
+type Sender = mpsc::Sender<(String, usize, usize)>;
 type Join = thread::JoinHandle<()>;
 
 pub struct Shuffler {
@@ -40,9 +40,16 @@ impl Shuffler {
                         // But still need to reduce it while finding the target value.
                         let index = self.group.make_index(&value) as usize;
 
-                        log::trace!("Send value {} to thread index {}", value, index);
+                        let thread_num = index % self.group.threads() as usize;
 
-                        senders[index].send((value, lineno)).unwrap();
+                        log::trace!(
+                            "Send value {} to thread {} with index {}",
+                            value,
+                            thread_num,
+                            index
+                        );
+
+                        senders[thread_num].send((value, lineno, index)).unwrap();
                     }
                     Err(err) => return Err(err.into()),
                 }
@@ -59,21 +66,33 @@ impl Shuffler {
     }
 
     fn spawn_mappers(&self) -> (Vec<Sender>, Vec<Join>) {
-        (0..self.group.size())
+        (0..self.group.threads())
             .into_iter()
-            .map(|idx| {
+            .map(|thread_index| {
                 let (tx, rx) = mpsc::channel();
 
-                let tmp_file = shuffle::temp_file(idx);
+                let group_size = self.group.size();
+                let thread_nums = self.group.threads();
 
-                log::debug!(
-                    "Try to create temp file {} in entry format for future reducing.",
-                    tmp_file
-                );
+                let handle = thread::spawn(move || {
+                    let range = group_size / thread_nums;
 
-                let file = fs::File::create(tmp_file).expect("Can't create temp file");
+                    let files = (0..range)
+                        .into_iter()
+                        .map(|idx| {
+                            let index = thread_index + idx * thread_nums;
+                            let tmp_file = shuffle::temp_file(index);
 
-                let handle = thread::spawn(move || entry_writer(file, rx));
+                            log::debug!(
+                                "Try to create temp file {} in entry format for future reducing.",
+                                tmp_file
+                            );
+                            fs::File::create(tmp_file).expect("Can't create temp file")
+                        })
+                        .collect();
+
+                    entry_writer(files, thread_nums, rx);
+                });
 
                 (tx, handle)
             })
@@ -81,14 +100,21 @@ impl Shuffler {
     }
 }
 
-fn entry_writer<W: Write>(target: W, rx: mpsc::Receiver<(String, usize)>) {
-    let mut writer = BufWriter::new(target);
+fn entry_writer<W: Write>(
+    target: Vec<W>,
+    thread_nums: u32,
+    rx: mpsc::Receiver<(String, usize, usize)>,
+) {
+    assert!(thread_nums > 0);
 
-    for (key, index) in rx {
-        let block = entry::Block::create(key, index);
+    let mut writers: Vec<_> = target.into_iter().map(BufWriter::new).collect();
+
+    for (key, lineno, file_index) in rx {
+        let block = entry::Block::create(key, lineno);
+        let index = file_index / thread_nums as usize;
 
         // We'll panic here and the parent (main) thread can be notified and safely panic as well.
-        writer
+        writers[index]
             .write(&block.as_bytes())
             .expect("Failed to write block within entry writer");
     }
@@ -107,12 +133,12 @@ mod tests {
 
         let _ = thread::spawn(move || {
             for (idx, val) in source_clone.into_iter().enumerate() {
-                tx.send((val.to_string(), idx)).unwrap();
+                tx.send((val.to_string(), idx, 0)).unwrap();
             }
         });
 
         let mut entries = vec![];
-        entry_writer(&mut entries, rx);
+        entry_writer(vec![&mut entries], 1, rx);
 
         let entries = Block::parse_entries(entries);
 
