@@ -8,5 +8,5 @@
 # Test files
 *large.csv
 
-# Generated
-/src/protos/
+# Garbage
+.DS_Store

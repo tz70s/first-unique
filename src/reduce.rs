@@ -62,8 +62,9 @@ impl Reducer {
         let mut buf = Vec::with_capacity(1024);
         reader.read_to_end(&mut buf).unwrap();
 
+        // TODO: use Iterator to wrap these?
         let merged_map =
-            Block::parse_entries(&buf)
+            Block::parse_entries(buf)
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, entry| {
                     if let Some(old_record) = acc.get(&entry.key) {

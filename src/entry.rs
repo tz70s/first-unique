@@ -3,9 +3,8 @@
 //! Including to: `Record`, `Entry` and `Block`.
 
 use std::fmt::{self, Display};
-use std::io::Cursor;
 
-use bytes::{self, Buf, BufMut};
+use bytes::{self, Buf, BufMut, IntoBuf};
 
 /// Storing the metadata for tracking through the algorithm.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -98,23 +97,24 @@ impl Block {
         buf.take()
     }
 
-    pub fn parse_entries(bytes: &[u8]) -> Vec<Entry> {
+    pub fn parse_entries(bytes: Vec<u8>) -> Vec<Entry> {
         let mut entries = vec![];
-        let mut buf = Cursor::new(bytes);
+        let mut buffer = bytes::Bytes::from(bytes).into_buf();
 
         // FIXME: should carefully consider the error path and corner case.
+        while buffer.has_remaining() {
+            let offset = buffer.get_u64_be() as usize;
 
-        while buf.has_remaining() {
-            let offset = buf.get_u64_be() as usize;
+            let reference = bytes::Buf::by_ref(&mut buffer);
 
-            let key = std::str::from_utf8(buf.by_ref().take(offset).bytes())
+            let key = std::str::from_utf8(&bytes::Buf::take(reference, offset).bytes())
                 .unwrap()
                 .to_string();
 
-            buf.advance(offset);
+            buffer.advance(offset);
 
-            let count = buf.get_u64_be();
-            let index = buf.get_u64_be();
+            let count = buffer.get_u64_be();
+            let index = buffer.get_u64_be();
 
             let entry = Entry::new(key, index as usize);
             entries.push(entry);
@@ -167,7 +167,7 @@ mod tests {
             Entry::new("World".to_string(), 1),
         ];
 
-        let entries = Block::parse_entries(bytes_slice);
+        let entries = Block::parse_entries(bytes_slice.to_vec());
 
         assert_eq!(entries, expect);
     }

@@ -114,7 +114,7 @@ mod tests {
         let mut entries = vec![];
         entry_writer(&mut entries, rx);
 
-        let entries = Block::parse_entries(&entries);
+        let entries = Block::parse_entries(entries);
 
         let expect: Vec<_> = source
             .into_iter()

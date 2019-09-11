@@ -14,6 +14,7 @@ use failure::Error;
 mod shuffler;
 
 pub const TEMP_FILE_PREFIX: &'static str = "/tmp/word-count";
+pub const DEFAULT_GROUP_SIZE: u32 = 8;
 
 fn temp_file(index: u32) -> String {
     format!("{}{}", TEMP_FILE_PREFIX, index)
@@ -26,7 +27,7 @@ pub struct Group {
 
 impl Group {
     pub fn run<R: Read>(csv_source: R) -> Result<Group, Error> {
-        Group::run_with_group_size(csv_source, 8)
+        Group::run_with_group_size(csv_source, DEFAULT_GROUP_SIZE)
     }
 
     pub fn run_with_group_size<R: Read>(csv_source: R, group_size: u32) -> Result<Group, Error> {

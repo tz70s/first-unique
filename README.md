@@ -4,11 +4,11 @@ Find first unique word from a large CSV file.
 ## Execution
 
 ```bash
-# From sample data.
-cargo run --example check
+# Run binary.
+cargo run <csv_file>
 
-# Integration tests (mostly are ignored due to generate large file size).
-cargo test -- --ignored
+# Tests
+cargo test
 ```
 
 ## Problem Description
@@ -52,3 +52,10 @@ The basic idea is not a uniform distribution solution, but we can simply use has
 
 ## Optimization Tricks
 
+### Evaluation Setup
+
+Use my own MacBook Pro'18 for 2.3 GHz Intel Core i5 CPU (4 core with hyper-threading), 16 GB RAM and less than 80 GB Disk space (Apple SSD).
+
+```bash
+cargo build --release
+```

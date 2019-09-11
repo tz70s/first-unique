@@ -5,6 +5,7 @@
 //! cargo run --bin csv_generator
 //! ```
 
+use failure::Error;
 use rand::{self, Rng};
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -22,7 +23,7 @@ fn random_string(length: usize) -> String {
     rand_string
 }
 
-pub fn create_test_csv(location: &str) -> Result<(), std::io::Error> {
+pub fn create_test_csv(location: &str) -> Result<(), Error> {
     let path = std::path::Path::new(location);
 
     if !path.exists() {
