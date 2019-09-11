@@ -14,7 +14,7 @@ use failure::Error;
 mod shuffler;
 
 pub const TEMP_FILE_PREFIX: &'static str = "/tmp/word-count";
-pub const DEFAULT_GROUP_SIZE: u32 = 64;
+pub const DEFAULT_GROUP_SIZE: u32 = 128;
 pub const DEFAULT_THREADS: u32 = 8;
 
 fn temp_file(index: u32) -> String {

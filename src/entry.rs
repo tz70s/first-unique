@@ -120,6 +120,7 @@ impl Block {
             entries.push(entry);
         }
 
+        entries.shrink_to_fit();
         entries
     }
 }

@@ -98,9 +98,23 @@ The `Block` struct consists of additional 24 bytes for 3 `u64` variables (offset
 Therefore, if keys in source file are small, the intermediate file are much greater as well as memory usage.
 However, using `u64` is much scalable for large number of entries.
 
-### Potential Enhancement
+### Unresolve Bottleneck
 
 Memory reduction has a bottleneck in reducing phase.
+
+In theory, we can partition original files into small enough size and reduce them within small number of parallelism,
+therefore ensure the total memory within machine can be fit.
+
+However, in practice, there's two potential trade-off: limited file numbers and performance.
+
+The current memory reduction bottleneck is using the dynamic resizing vector (which grows exponentially)
+and additional space for bytes parsing. Shown in the following image.
+
+The memory allocation graph shows that there are some _peaks_ of memory allocations (but we call `shrink_to_fit` immediately).
+![](https://github.com/tz70s/first-unique/blob/master/images/memory_alloc_peak.png)
+
+Those allocation costs come from `Vec<u8>` and `Vec<Entry>` for parsing (persist in memory at the same time).
+![](https://github.com/tz70s/first-unique/blob/master/images/callstack_mem.png)
 
 ### Evaluation Setup
 

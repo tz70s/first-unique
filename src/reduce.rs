@@ -1,4 +1,9 @@
-//! Reducer
+//! Reducer perform two phases of reduction.
+//!
+//! First, for each local partition, translate entries into word count based hash map,
+//! and find the earliest (by index).
+//!
+//! Second, merge those earliest entry and find the earliest entry.
 
 use std::collections::HashMap;
 use std::fs;
@@ -26,7 +31,7 @@ impl Reducer {
     fn reduce_global_unique(&self) -> Option<String> {
         let mut entries = Vec::new();
 
-        let thread_nums = self.group.threads();
+        let thread_nums = self.group.threads() / 2;
 
         let thread_groups = self.group.size() / thread_nums;
 
@@ -82,23 +87,24 @@ impl Reducer {
 }
 
 fn reduce_local_unique<R: Read>(reader: &mut R) -> Option<entry::Entry> {
-    let mut buf = Vec::with_capacity(1024);
+    let mut buf = Vec::new();
     reader.read_to_end(&mut buf).unwrap();
+    buf.shrink_to_fit();
 
-    // TODO: use Iterator to wrap these?
-    let merged_map =
-        Block::parse_entries(buf)
-            .into_iter()
-            .fold(HashMap::new(), |mut acc, entry| {
-                if let Some(old_record) = acc.get(&entry.key) {
-                    let new_record = entry.record.merge(old_record);
-                    acc.insert(entry.key, new_record);
-                } else {
-                    acc.insert(entry.key, entry.record);
-                }
-                acc
-            });
+    let entries = Block::parse_entries(buf);
 
+    let mut merged_map = HashMap::new();
+
+    for entry in entries {
+        if let Some(old_record) = merged_map.get_mut(&entry.key) {
+            let new_record = entry.record.merge(old_record);
+            *old_record = new_record;
+        } else {
+            merged_map.insert(entry.key, entry.record);
+        }
+    }
+
+    merged_map.shrink_to_fit();
     find_first_entry_from_reduced_map(merged_map)
 }
 
@@ -109,13 +115,12 @@ fn find_first_entry_from_reduced_map(merged_map: HashMap<String, Record>) -> Opt
         |(origin, min_index), (key, record)| {
             if record.count == 1 && record.index < min_index {
                 let replaced_index = record.index;
-                let entry = entry::Entry::from_record(key, record);
+                let entry = entry::Entry::from_record(key.to_string(), record);
                 (Some(entry), replaced_index)
             } else {
                 (origin, min_index)
             }
         },
     );
-
     result
 }
