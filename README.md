@@ -119,9 +119,18 @@ The current memory reduction bottleneck is using the dynamic resizing vector (wh
 and additional space for bytes parsing. Shown in the following image.
 
 The memory allocation graph shows that there are some _peaks_ of memory allocations (but we call `shrink_to_fit` immediately).
-![](https://github.com/tz70s/first-unique/blob/master/images/memory_alloc_peak.png)
 
-Those allocation costs come from `Vec<u8>` and `Vec<Entry>` for parsing (persist in memory at the same time).
+First, for 1 GB file (worst-case, all unique words), 128 shards and 4 simultaneous reducers.
+
+![](https://github.com/tz70s/first-unique/blob/master/images/file_1g_128_shard_4_reducer.png)
+
+Second, for 1 GB file (worst-case, all unique words), 128 shards and 2 simultaneous reducers.
+
+![](https://github.com/tz70s/first-unique/blob/master/images/file_1g_128_shard_2_reducer.png)
+
+The cause of those allocation costs come from `Vec<u8>` and `Vec<Entry>` for parsing (persist in memory at the same time),
+in function `std::io::read_to_end` and `first_unique::entry::Block::parse_entries`.
+
 ![](https://github.com/tz70s/first-unique/blob/master/images/callstack_mem.png)
 
 ### Evaluation Setup
