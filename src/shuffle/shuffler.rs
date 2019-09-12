@@ -32,24 +32,28 @@ impl Shuffler {
             // To avoid deadlock, we need to drop senders here to terminate mapper threads.
             let senders = senders;
 
-            for (lineno, line) in buff_reader.lines().enumerate() {
+            let mut order = 0;
+
+            for line in buff_reader.lines() {
                 match line {
-                    Ok(value) => {
-                        // Note: the value here contains a ',' at the end.
-                        // We don't need to do early trim to reduce overhead.
-                        // But still need to reduce it while finding the target value.
-                        let index = self.group.make_index(&value) as usize;
+                    Ok(line_str) => {
+                        for key in line_str.split(',').filter(|c| !c.is_empty()) {
+                            let index = self.group.make_index(key) as usize;
 
-                        let thread_num = index % self.group.threads() as usize;
+                            let thread_num = index % self.group.threads() as usize;
 
-                        log::trace!(
-                            "Send value {} to thread {} with index {}",
-                            value,
-                            thread_num,
-                            index
-                        );
+                            log::trace!(
+                                "Send key {} to thread {} with index {}",
+                                key,
+                                thread_num,
+                                index
+                            );
 
-                        senders[thread_num].send((value, lineno, index)).unwrap();
+                            senders[thread_num]
+                                .send((key.to_string(), order, index))
+                                .unwrap();
+                            order += 1;
+                        }
                     }
                     Err(err) => return Err(err.into()),
                 }
@@ -122,8 +126,9 @@ fn entry_writer<W: Write>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::entry::{Block, Entry};
+
+    use super::*;
 
     #[test]
     fn test_entry_writer() {

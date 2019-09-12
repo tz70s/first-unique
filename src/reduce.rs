@@ -82,7 +82,7 @@ impl Reducer {
                     }
                 });
 
-        result.map(|text| text.trim_end_matches(',').to_string())
+        result
     }
 }
 
